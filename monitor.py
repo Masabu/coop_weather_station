@@ -8,6 +8,8 @@ import onewire
 import ds18x20
 from secret import BLYNK_AUTH_TOKEN
 
+
+
 print(f"{BLYNK_AUTH_TOKEN}")
 
 class Monitor:
@@ -22,6 +24,18 @@ class Monitor:
         # Blynk configuration
         self.BLYNK_AUTH = AUTH
         self.BLYNK_URL = "https://blynk.cloud/external/api/batch/update"
+
+
+        self.MORSE_CODE_DICT = {
+            'A': '.-',    'B': '-...',  'C': '-.-.',  'D': '-..',   'E': '.',
+            'F': '..-.',  'G': '--.',   'H': '....',  'I': '..',    'J': '.---',
+            'K': '-.-',   'L': '.-..',  'M': '--',    'N': '-.',    'O': '---',
+            'P': '.--.',  'Q': '--.-',  'R': '.-.',   'S': '...',   'T': '-',
+            'U': '..-',   'V': '...-',  'W': '.--',   'X': '-..-',  'Y': '-.--',
+            'Z': '--..',
+            '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-',
+            '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.'
+        }
 
     def send_to_blynk(self, sensor1_temp, sensor2_temp):
         """Send both sensor readings in one API call"""
@@ -40,6 +54,24 @@ class Monitor:
         except Exception as e:
             print(f'Error sending to Blynk: {e}')
             return False
+
+    def send_morse_code(self, char, pin_num, dot_time=0.2):
+        led = Pin(pin_num, Pin.OUT)
+        code = self.MORSE_CODE_DICT.get(str(char).upper())
+        if not code:
+            print("Character not supported")
+            return
+        for symbol in code:
+            if symbol == '.':
+                led.on()
+                sleep(dot_time)
+                led.off()
+            elif symbol == '-':
+                led.on()
+                sleep(dot_time * 3)
+                led.off()
+            sleep(dot_time)  # Space between symbols
+        sleep(dot_time * 3)  # Space between characters
 
     def read_humidity(self):
         """Placeholder for humidity sensor reading"""

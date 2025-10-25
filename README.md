@@ -1,22 +1,54 @@
+
 # coop_weather_station
-chicken coop weather station 
+Chicken coop weather station
 
-It has two BS18B20 temparature sensor, they are both attached at Pin5.
+## Hardware
+* Two DS18B20 temperature sensors, both attached at Pin 5.
+* LED Pin 4   : WiFi status (green)
+* LED Pin 22  : Sensor status (yellow)
+* LED Pin 23  : Data transmission status (red)
 
-LED Pin2   : wifi status (green)
-LED Pin 22 : data transfer (red)
-LED Pin 23 : 2 probes found (yellow)
+## Python Class: Monitor
+The `Monitor` class in `monitor.py` manages temperature sensor readings and Blynk data transmission.
 
-## useful commands
+- **Initialization:**
+	- `Monitor(ds_pin, AUTH)` sets up the DS18B20 sensors and Blynk configuration.
+- **send_to_blynk:**
+	- Sends both temperature readings to Blynk in a single API call.
+- **read_humidity:**
+	- Placeholder for future humidity sensor integration.
+- **led_blink:**
+	- Blinks an LED on a specified pin to indicate data transmission or status.
+- **loop_section(wait_time):**
+	- Main loop: reads temperatures, sends data, blinks LED, and waits for the next cycle.
+
+## main.py Usage
+`main.py` handles WiFi connection, LED status indication, and starts the monitoring loop:
+
+1. Turns all status LEDs OFF at startup.
+2. Connects to WiFi and turns the WiFi status LED ON if successful.
+3. Creates a `Monitor` object and starts the main monitoring loop.
+
+Example:
+```python
+from monitor import Monitor
+from machine import Pin
+from secret import BLYNK_AUTH_TOKEN
+
+probe = Monitor(ds_pin=Pin(5), AUTH=BLYNK_AUTH_TOKEN)
+probe.loop_section(wait_time=100)
+```
+
+## Useful commands
 
 mpremote connect list  
 mpremote connect [device name]
 mpremote ls 
 
-### copy files
+### Copy files
 mpremote cp main.py :main.py 
 
-### reboot
+### Reboot
 mpremote connect /dev/cu.usbserial-0001 reset
 mpremote connect /dev/cu.usbserial-0001 repl
 

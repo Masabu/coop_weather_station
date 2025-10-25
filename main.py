@@ -1,7 +1,14 @@
 import network
 import time
-from secret import SSID, PASSWORD
+from secret import BLYNK_AUTH_TOKEN, SSID, PASSWORD
+from utilities import Led_Toggle
 
+## itialize LED to OFF state
+Led_Toggle(2, "OFF") # green light at D2 Pin2 : wifi status
+Led_Toggle(22, "OFF") # yellow light at D22 Pin22 : sensor status
+Led_Toggle(23, "OFF") # red light at D23 Pin23 : data transmission status
+
+## Turn on WIFI
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 print("Connecting to SSID:", SSID)
@@ -9,25 +16,12 @@ wlan.connect(SSID, PASSWORD)
 for _ in range(10):
     print("Connected?", wlan.isconnected())
     time.sleep(1)
+if wlan.isconnected():
+    Led_Toggle(2, "ON") # green light at D4 Pin4
 
-print("Final config:", wlan.ifconfig())
-
-
-# Run monitor.py after WiFi connection
 from monitor import Monitor
-from secret import BLYNK_AUTH_TOKEN
 from machine import Pin
 
-monitor = Monitor(ds_pin=Pin(5), AUTH=BLYNK_AUTH_TOKEN)
-
-print("Testing Morse Code on Pin 1")
-for i in range(10):
-    print(f"Sending Morse code for: {i}")
-    monitor.send_morse_code(str(i), 1, dot_time=0.2)
-    time.sleep(2)
-
-
-
-## send readings every 258 seconds
-monitor.loop_section(258)
+probe = Monitor(ds_pin=Pin(5), AUTH=BLYNK_AUTH_TOKEN)
+probe.loop_section(wait_time=100)
 

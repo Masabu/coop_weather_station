@@ -10,9 +10,12 @@ from machine import Pin, I2C
 from bme280 import BME280_I2C
 
 class Monitor:
-    def __init__(self, ds_pin, AUTH):
+    def __init__(self, AUTH):
         # Initialize components via small helper methods to keep __init__ tidy
         # allow ds_pin to be an int or a Pin instance
+
+        ds_pin = 5  # default to Pin 5 if not specified
+
         if isinstance(ds_pin, int):
             ds_pin = Pin(ds_pin)
         self._init_ds18(ds_pin)
@@ -36,10 +39,10 @@ class Monitor:
         i2c = I2C(0, scl=Pin(26), sda=Pin(25), freq=400000)
 
         # Scan for devices (should show 0x76 or 0x77)
-        devices = i2c.scan()
-        print("I2C devices found:", [hex(addr) for addr in devices])
+        self.devices = i2c.scan()
+        print("I2C devices found:", [hex(addr) for addr in self.devices])
 
-        if len(devices) == 1:
+        if len(self.devices) == 1:
             # indicate an I2C device was found
             Led_Toggle(27, "ON")
 
@@ -155,7 +158,7 @@ class Monitor:
         ok = self.send_to_blynk(data)
         return ok
 
-    def led_blink(self, pin_num=23, times=3, interval=0.2):
+    def led_blink(self, pin_num=23, times=5, interval=0.2):
         led = Pin(pin_num, Pin.OUT)
         for _ in range(times):
             led.on()
@@ -168,7 +171,7 @@ class Monitor:
             ok = self.send_combined()
             if ok:
                 # short blink on success
-                self.led_blink(pin_num=23, times=1, interval=0.15)
+                self.led_blink(pin_num=23, times=5, interval=0.15)
             sleep(wait_time)
 
 
@@ -179,7 +182,7 @@ if __name__ == "__main__":
         BLYNK_AUTH_TOKEN = ''
 
     monitor = Monitor(ds_pin=5, AUTH=BLYNK_AUTH_TOKEN)
-    monitor.loop_section(wait_time=258)
+    monitor.loop_section(wait_time=60)
 
 
 

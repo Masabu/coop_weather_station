@@ -1,7 +1,8 @@
 import network
 import time
+import machine
 from secret import BLYNK_AUTH_TOKEN, SSID, PASSWORD
-from utilities import Led_Toggle
+from utilities import Led_Toggle, led_blink
 
 '''
 itialize LED to OFF state
@@ -32,10 +33,17 @@ for _ in range(10):
     time.sleep(1)
 if wlan.isconnected():
     Led_Toggle(2, "ON") # green light at D4 Pin4
+else:
+    print("WiFi connection failed. Restarting in 10 seconds...")
+    led_blink(pin_num=23, times=5, interval=0.1)
+    time.sleep(10)
+    machine.reset()
 
 
 from monitor import Monitor
 
 probe = Monitor(AUTH=BLYNK_AUTH_TOKEN)
-probe.loop_section(wait_time=100)
+probe.loop_section(wait_time=180)
+
+
 

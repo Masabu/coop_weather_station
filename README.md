@@ -7,6 +7,7 @@ Chicken coop weather station
 * LED Pin 4   : WiFi status (green)
 * LED Pin 22  : Sensor status (yellow)
 * LED Pin 23  : Data transmission status (red)
+* BME 280 Pin 25, 26: I2C port for barometer, temp, and humiditity
 
 ## Python Class: Monitor
 The `Monitor` class in `monitor.py` manages temperature sensor readings and Blynk data transmission.
@@ -43,12 +44,12 @@ probe.loop_section(wait_time=100)
 
 mpremote connect list  
 mpremote connect [device name]
-mpremote ls 
+mpremote ls
 
 ### Copy files
 mpremote cp main.py :main.py 
 
 ### Reboot
-mpremote connect /dev/cu.usbserial-0001 reset
-mpremote connect /dev/cu.usbserial-0001 repl
+mpremote connect /dev/ttyUSB0 reset
+mpremote connect /dev/ttyUSB0 repl
 

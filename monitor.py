@@ -1,3 +1,4 @@
+import machine
 
 import time
 import random
@@ -10,7 +11,21 @@ from machine import Pin, I2C
 from bme280 import BME280_I2C
 
 class Monitor:
+
+    def maybe_reboot(self, reboot_interval_sec=86400):
+        """
+        Reboot the ESP32 if uptime exceeds reboot_interval_sec (default: 1 day).
+        Call this periodically from your main loop.
+        """
+        now = time.time()
+        if now - self._last_reboot_time > reboot_interval_sec:
+            print("[Monitor] Rebooting system after scheduled interval...")
+            machine.reset()
+
     def __init__(self, AUTH):
+        # Track last reboot time for scheduled reboot logic
+        self._last_reboot_time = time.time()
+        self.ds_sensor_init = False
         # Initialize components via small helper methods to keep __init__ tidy
         # allow ds_pin to be an int or a Pin instance
 
@@ -23,18 +38,33 @@ class Monitor:
         self._init_blynk(AUTH)
 
     def _init_ds18(self, ds_pin):
-        """Initialize DS18B20 sensor bus and LEDs."""
+        """Initialize DS18B20 sensor bus and LEDs, with retries."""
         self.ds_pin = ds_pin
-        self.ds_sensor = ds18x20.DS18X20(onewire.OneWire(self.ds_pin))
-        self.roms = self.ds_sensor.scan()
-        print(f'Found {len(self.roms)} sensor(s)')
+        self.ds_sensor = None
+        self.roms = []
+        self.ds_sensor_init = False
+        for attempt in range(3):
+            try:
+                self.ds_sensor = ds18x20.DS18X20(onewire.OneWire(self.ds_pin))
+                self.roms = self.ds_sensor.scan()
+                print(f'DS18B20: Found {len(self.roms)} sensor(s) (attempt {attempt+1})')
+                if len(self.roms) > 0:
+                    self.ds_sensor_init = True
+                    break
+            except Exception as e:
+                print(f'DS18B20 init failed (attempt {attempt+1}):', e)
+                self.ds_sensor = None
+                self.roms = []
+            if attempt < 2:
+                print('Retrying DS18B20 initialization in 2 seconds...')
+                sleep(2)
 
         if len(self.roms) == 2:
             print("2 DS18B20 sensors found!")
             Led_Toggle(22, "ON")  # orange light at D22 Pin22
 
     def _init_i2c_and_bme(self):
-        """Initialize I2C bus, detect devices and create a BME280 instance."""
+        """Initialize I2C bus, detect devices and create a BME280 instance, with retries."""
         # Using SCL=Pin(26), SDA=Pin(25)
         i2c = I2C(0, scl=Pin(26), sda=Pin(25), freq=400000)
 
@@ -45,14 +75,28 @@ class Monitor:
         if len(self.devices) == 1:
             # indicate an I2C device was found
             Led_Toggle(27, "ON")
+            self.bme_addr = hex(self.devices[0])
 
-        # Initialize BME280 (may raise if device not present)
-        try:
-            self.bme = BME280_I2C(i2c, address=0x77)
-            print("✓ BME280 initialized on I2C!")
-        except Exception as e:
-            print("BME280 init failed:", e)
-            self.bme = None
+        # Try to initialize BME280 up to 3 times
+        self.bme = None
+        self.bme_init = False
+        for attempt in range(3):
+            try:
+                self.bme = BME280_I2C(i2c, address=0x77)
+                print(f"✓ BME280 initialized on I2C! (attempt {attempt+1})")
+                self.bme_init = True
+                break
+            except Exception as e:
+                print(f"BME280 init failed (attempt {attempt+1}):", e)
+                self.bme = None
+                if attempt < 2:
+                    print("Retrying BME280 initialization in 2 seconds...")
+                    sleep(2)
+        self.log['bme280'] = {
+            'init': self.bme_init,
+            'devices': self.devices.copy(),
+            'attempts': attempt+1
+        }
 
     def _init_blynk(self, AUTH):
         """Set Blynk configuration values."""
@@ -172,6 +216,17 @@ class Monitor:
             if ok:
                 # short blink on success
                 self.led_blink(pin_num=23, times=5, interval=0.15)
+
+                # send blink time of update
+                import time
+
+                t = time.localtime()  # (year, month, mday, hour, min, sec, wday, yday)
+                timestamp = "{:04d}-{:02d}-{:02d}:{:02d}:{:02d}".format(t[0], t[1], t[2], t[3], t[4])
+                print(timestamp)
+                self.send_to_blynk({"V5": f"'{timestamp}'","V6": f"{timestamp}"})
+
+            # Check if it's time to reboot (default: once per 24h)
+            self.maybe_reboot(reboot_interval_sec=86400)
             sleep(wait_time)
 
 
@@ -181,7 +236,7 @@ if __name__ == "__main__":
     except Exception:
         BLYNK_AUTH_TOKEN = ''
 
-    monitor = Monitor(ds_pin=5, AUTH=BLYNK_AUTH_TOKEN)
+    monitor = Monitor(AUTH=BLYNK_AUTH_TOKEN)
     monitor.loop_section(wait_time=60)
 
 

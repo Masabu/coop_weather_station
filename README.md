@@ -78,6 +78,7 @@ mpremote ls
 
 ### Copy files
 mpremote cp main.py :main.py 
+bash upload_to_esp32.sh 
 
 ### Reboot
 mpremote connect /dev/ttyUSB0 reset

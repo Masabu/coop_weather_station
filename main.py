@@ -1,18 +1,11 @@
 import network
 import time
 import machine
-from secret import BLYNK_AUTH_TOKEN, SSID, PASSWORD
-from utilities import Led_Toggle, led_blink
+from secret import BLYNK_AUTH_TOKEN, SSID2, PASSWORD, SSID1
+from utilities import Led_Toggle, led_blink, connect_wifi
+### set time
+import ntptime
 
-'''
-itialize LED to OFF state
-
-Led_Toggle(2, "OFF") # green light at D2 Pin2 : wifi status
-Led_Toggle(22, "OFF") # yellow light at D22 Pin22 : sensor status
-Led_Toggle(23, "OFF") # red light at D23 Pin23 : data transmission status
-Led_Toggle(27, "OFF") # blue light at D27 Pin27: BME 280 sensor status
-
-'''
 
 i = 0
 LEDs = [2,22,23,27]
@@ -23,26 +16,34 @@ while i <8:
         Led_Toggle(l, "OFF")
     i +=1
 
-## Turn on WIFI
-wlan = network.WLAN(network.STA_IF)
-wlan.active(True)
-print("Connecting to SSID:", SSID)
-wlan.connect(SSID, PASSWORD)
-for _ in range(10):
-    print("Connected?", wlan.isconnected())
-    time.sleep(1)
-if wlan.isconnected():
-    Led_Toggle(2, "ON") # green light at D4 Pin4
-else:
-    print("WiFi connection failed. Restarting in 10 seconds...")
-    led_blink(pin_num=23, times=5, interval=0.1)
-    time.sleep(10)
-    machine.reset()
+log = {}
 
+
+
+# Usage:
+connect_wifi([SSID1, SSID2], [PASSWORD, PASSWORD], log=log)
+
+time.sleep(5)
+
+try:
+    ntptime.settime()  # Sets the RTC to UTC from NTP
+    print("NTP time sync successful")
+    log['ntp_sync'] = True
+except Exception as e:
+    print("NTP sync failed:", e)
+    log['ntp_sync'] = False
 
 from monitor import Monitor
 
 probe = Monitor(AUTH=BLYNK_AUTH_TOKEN)
+
+log['bme_connected'] = probe.bme_init
+log['bme_address'] = probe.bme_addr if log['bme_connected'] else None
+log['ds18b20_sensors'] = len(probe.roms)
+log['ds18b20_connected'] = probe.ds_sensor_init
+
+print("Initialization log:", log)
+
 probe.loop_section(wait_time=180)
 
 

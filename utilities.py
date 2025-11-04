@@ -1,9 +1,29 @@
 import network
 import time
 
+def sync_time_chicago(log):
+    import ntptime
+    try:
+        ntptime.settime()  # Sets the RTC to UTC from NTP
+        print("NTP time sync successful")
+        log['ntp_sync'] = True
+    except Exception as e:
+        print("NTP sync failed:", e)
+        log['ntp_sync'] = False
+    # Set timezone offset for Chicago (UTC-6 or UTC-5 DST)
+    # MicroPython does not handle DST, so use UTC-6 for standard time
+    chicago_offset = -6 * 3600
+    t = time.localtime(time.time() + chicago_offset)
+    # Format: YYYY:MM-DD:HH:MM
+    localtime_str = "{:04d}:{:02d}-{:02d}:{:02d}:{:02d}".format(t[0], t[1], t[2], t[3], t[4])
+    log['localtime_str'] = localtime_str
+    
 def connect_wifi(ssid_list, password_list, max_attempts=10, log=None):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+    if log is not None:
+        log['wifi'] = {}
+
     for ssid, password in zip(ssid_list, password_list):
         print("Trying SSID:", ssid)
         wlan.disconnect()
@@ -13,18 +33,16 @@ def connect_wifi(ssid_list, password_list, max_attempts=10, log=None):
             if wlan.isconnected():
                 print("Connected to", ssid)
                 print("IP:", wlan.ifconfig()[0])
+                Led_Toggle(2, "ON")
                 if log is not None:
-                    log['ip'] = wlan.ifconfig()[0]
-                    log['ssid'] = ssid
-                    log['attempts'] = attempt + 1
+                    log['wifi']['ip'] = wlan.ifconfig()[0]
+                    log['wifi']['ssid'] = ssid
+                    log['wifi']['attempts'] = attempt + 1
                 return True
             time.sleep(1)
         print("Failed to connect to", ssid)
     print("All SSIDs failed.")
-    if log is not None:
-        log['ip'] = None
-        log['ssid'] = None
-        log['attempts'] = max_attempts * len(ssid_list)
+
     return False
 ## utilities.py
 

@@ -4,7 +4,7 @@ Chicken coop weather station
 
 ## Hardware
 * Two DS18B20 temperature sensors, both attached at Pin 5.
-* LED Pin 4   : WiFi status (green)
+* LED Pin 2   : WiFi status (green)
 * LED Pin 22  : Sensor status (yellow)
 * LED Pin 23  : Data transmission status (red)
 * LED Pin 27  : I2C/BME280 status (blue)
@@ -24,51 +24,81 @@ If you add extra LEDs, safe GPIO choices are e.g. 13, 16, 17, 27, 32, 33 on most
 
 ## Python Class: Monitor (overview)
 
-`monitor.py` provides the `Monitor` class which centralizes sensor reads and Blynk uploads. Recent updates make the class modular and reduce API usage by sending combined payloads.
+`monitor.py` provides the `Monitor` class, which centralizes sensor reads, Blynk uploads, and system diagnostics. The class is modular, robust, and supports centralized logging.
 
-- Constructor: `Monitor(ds_pin, AUTH)`
-  - `ds_pin` may be an integer GPIO number or a `machine.Pin` instance (default in examples: Pin 5)
-  - `AUTH` is your Blynk auth token (from `secret.py` in the repo)
-  - Initialization is split into small helpers:
-	- `_init_ds18()` — sets up the DS18B20 one-wire bus and marks sensor LED
-	- `_init_i2c_and_bme()` — scans I2C and initializes BME280 (if present)
-	- `_init_blynk()` — stores Blynk endpoint and token
+### Monitor class methods
 
-Key methods
+- `__init__(self, AUTH, log=None)`
+	- Initializes DS18B20, BME280, and Blynk. Accepts a log dictionary for diagnostics.
+- `_init_ds18(self, ds_pin)`
+	- Sets up the DS18B20 one-wire bus and logs sensor status.
+- `_init_i2c_and_bme(self)`
+	- Scans I2C and initializes BME280 (if present), with retries and logging.
+- `_init_blynk(self, AUTH)`
+	- Stores Blynk endpoint and token.
+- `maybe_reboot(self, reboot_interval_sec=86400)`
+	- Reboots the ESP32 if uptime exceeds the interval (default: 1 day).
+- `send_to_blynk(self, data)`
+	- Sends a dict of virtual-pin → value pairs to Blynk in one API call.
+- `read_ds(self)`
+	- Reads DS18B20 sensors and returns a list of temperatures.
+- `read_bme(self)`
+	- Reads the BME280 and returns (temp, pressure, humidity) or None.
+- `read_all(self)`
+	- Reads all sensors and returns a dict mapping virtual pins to values.
+- `send_combined(self)`
+	- Reads all sensors and sends a single Blynk payload if any data present.
+- `led_blink(self, pin_num=23, times=5, interval=0.2)`
+	- Blinks the specified LED for status indication.
+- `loop_section(self, wait_time=30)`
+	- Main loop: sends combined sensor data, blinks LED, and checks for scheduled reboot.
 
-- `read_ds()` — converts & reads DS18B20 sensors; returns a list of temperatures (may include `None` for failed reads).
-- `read_bme()` — reads the BME280 and returns `(temp, pressure, humidity)` or `None` when unavailable.
-- `read_all()` — combines available sensor readings into a single dict mapped to Blynk virtual pins:
-  - DS18B20: V0 (sensor 1), V1 (sensor 2)
-  - BME280: V2 (temp), V3 (pressure), V4 (humidity)
-- `send_to_blynk(data)` — accepts a dict of virtual-pin → value (keys may be `V0`, `'0'`, or `0`) and sends them in a single HTTP GET to Blynk's batch/update endpoint.
-- `send_combined()` — helper that calls `read_all()` and sends the combined payload if non-empty.
-- `loop_section(wait_time)` — main loop: calls `send_combined()` every `wait_time` seconds and blinks the data LED on successful send.
+#### Behavior notes
 
-Behavior notes
+- Combined payload: When at least one sensor returns a value, the monitor sends a single, combined Blynk request containing all available values, reducing API calls and network overhead.
+- Empty payloads: If no sensors return values, `send_combined()` will not send data to Blynk (prints "No sensor data to send").
+- BME initialization: If initialization fails, BME reads are skipped and logged.
 
-- Combined payload: When at least one sensor returns a value the monitor will send a single, combined Blynk request containing all available values. This reduces API calls and network overhead.
-- Empty payloads: If no sensors return values, `send_combined()` will not send data to Blynk (it prints "No sensor data to send"). If you want a heartbeat or to resend last-known values, see the suggestions in the repo (or ask and I'll add them).
-- BME initialization: `monitor` detects I2C devices and attempts to initialize the BME280. If initialization fails the code sets `self.bme = None` and continues; BME reads are skipped.
 
 ## main.py Usage
-`main.py` handles WiFi connection, LED status indication, and starts the monitoring loop.
+`main.py` handles WiFi connection, time sync, LED status, and starts the monitoring loop.
 
-Typical flow
-
-1. Turn status LEDs OFF at startup
-2. Connect to WiFi and turn the WiFi LED ON if successful
-3. Create a `Monitor` and start `loop_section()`
+Typical flow:
+1. Blink all status LEDs at startup
+2. Connect to WiFi using `connect_wifi` (with logging)
+3. Sync time to NTP and set Chicago time using `sync_time_chicago`
+4. Create a `Monitor` and start `loop_section()`
 
 Example:
 ```python
 from monitor import Monitor
-from machine import Pin
 from secret import BLYNK_AUTH_TOKEN
+from utilities import connect_wifi, sync_time_chicago
 
-probe = Monitor(ds_pin=Pin(5), AUTH=BLYNK_AUTH_TOKEN)
-probe.loop_section(wait_time=100)
+log = {}
+connect_wifi([SSID1, SSID2], [PASSWORD, PASSWORD], log=log)
+sync_time_chicago(log)
+probe = Monitor(AUTH=BLYNK_AUTH_TOKEN, log=log)
+probe.loop_section(wait_time=180)
 ```
+
+
+## utilities.py functions/classes
+
+- `sync_time_chicago(log)`
+	- Syncs time from NTP and sets local time to Chicago (UTC-6), logging results and formatted local time string.
+- `connect_wifi(ssid_list, password_list, max_attempts=10, log=None)`
+	- Connects to WiFi, tries multiple SSIDs, logs status and IP.
+- `Led_Toggle(pin_num, status)`
+	- Turns an LED ON or OFF.
+- `led_blink(pin_num=23, times=5, interval=0.2)`
+	- Blinks an LED for status indication.
+- `Weather(latitude, longitude, timezone="America/Chicago", forecast_days=3)`
+	- Class for fetching and parsing weather forecasts from Open-Meteo.
+		- `get_weather_forecast()`
+		- `weather_code_to_condition(code)`
+		- `send_weather_summary_to_blynk(monitor, weather_summary)`
+		- `print_daily_forecast(weather_data)`
 
 ## Useful commands
 

@@ -28,6 +28,6 @@ from monitor import Monitor
 
 probe = Monitor(AUTH=BLYNK_AUTH_TOKEN, log=log)
 print("Initialization log:", probe.log)
-probe.loop_section(wait_time=180)
+probe.loop_section(wait_time=60)
 
 

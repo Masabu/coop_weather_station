@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Minimal uploader: loop over main.py and monitor.py
-for f in main.py monitor.py secret.py utilities.py bme280.py ; do
+for f in main.py monitor.py secret.py utilities.py bme280.py sms.py ; do
 	if [ -f "$f" ]; then
 		mpremote cp "$f" ":$f"
 	else
